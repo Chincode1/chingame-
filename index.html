@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ร้านเครดิต</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500&display=swap" rel="stylesheet"><style>
+:root{--bg:#fff;--tx:#111;--mu:#8a8a8a;--bd:#ececec;--ac:#111;--ac2:#fff;--ok:#16a34a;--er:#d92d20;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0e0e;--tx:#f1f1f1;--mu:#8c8c8c;--bd:#242424;--ac:#f1f1f1;--ac2:#0e0e0e}}
+:root[data-theme="dark"]{--bg:#0e0e0e;--tx:#f1f1f1;--mu:#8c8c8c;--bd:#242424;--ac:#f1f1f1;--ac2:#0e0e0e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:"Noto Sans Thai",system-ui,sans-serif;font-size:15px;font-weight:400;line-height:1.6}
+a{color:var(--tx)}.w{max-width:880px;margin:0 auto;padding:0 20px 48px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:20px 0;margin-bottom:28px;border-bottom:1px solid var(--bd)}
+.lg{font-weight:500;font-size:17px;letter-spacing:.02em;display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0}
+.lg img{height:28px;max-width:110px;object-fit:contain}.hr{display:flex;align-items:center;gap:8px}
+.cr{font-size:13px;color:var(--mu);margin-right:4px;white-space:nowrap}
+.ib{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:7px 11px;cursor:pointer;font:inherit;font-size:13px}
+nav{display:flex;gap:22px;margin-bottom:28px;border-bottom:1px solid var(--bd);overflow-x:auto}
+nav button{background:none;border:0;border-bottom:1.5px solid transparent;padding:0 0 12px;color:var(--mu);font:inherit;cursor:pointer;white-space:nowrap;margin-bottom:-1px}
+nav button.on{color:var(--tx);border-color:var(--tx)}
+.c{border:1px solid var(--bd);border-radius:12px;padding:20px;margin-bottom:14px}.c h3{margin:0 0 4px;font-size:15px;font-weight:500}
+.mu{color:var(--mu);font-size:14px}.r{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:24px 16px}
+.p{cursor:pointer}.p .im{aspect-ratio:1;background:var(--bd);border-radius:10px;overflow:hidden}
+.p img,.big{width:100%;height:100%;object-fit:cover;display:block}.p img{transition:opacity .2s}.p:hover img{opacity:.88}
+.p .t{padding:10px 2px 0}.p b{display:block;font-weight:500;font-size:14px}
+input,textarea{width:100%;padding:11px 0;border:0;border-bottom:1px solid var(--bd);background:transparent;color:var(--tx);font:inherit;margin:4px 0 10px;outline:0;border-radius:0}
+input:focus,textarea:focus{border-color:var(--tx)}input[type=file]{font-size:13px;color:var(--mu);border:0}
+.b{padding:11px 22px;border:1px solid var(--ac);border-radius:8px;background:var(--ac);color:var(--ac2);font:inherit;font-size:14px;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
+.b.s{background:transparent;color:var(--tx);border-color:var(--bd)}.b.d{background:var(--er);border-color:var(--er);color:#fff}.b.sm{padding:7px 14px;font-size:13px}.b:disabled{opacity:.4}
+.msg{margin-top:10px;padding:12px;border-radius:8px;background:var(--bd);white-space:pre-wrap;word-break:break-word;font-size:14px}
+#t{margin:6px 0;min-height:22px;font-size:14px}.ok{color:var(--ok)}.er{color:var(--er)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.md{background:var(--bg);border:1px solid var(--bd);border-radius:14px;max-width:420px;width:100%;max-height:90vh;overflow:auto}
+.md .bd{padding:20px}.md .big{aspect-ratio:1;height:auto}
+.au{max-width:340px;margin:40px auto}.au h2{font-weight:500;font-size:22px;margin:0 0 20px}
+</style></head><body><div class="w"><div id="app" class="mu">กำลังโหลด...</div></div><div id="mo"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let lastMsg="",db,me=null,showAuth=false,pend=null,credits=0,orders=[],products=[],site={},tab="shop",note="",authMode="in";
+const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+const say=(m,ok)=>{note=`<span class="${ok?'ok':'er'}">${esc(m)}</span>`;const t=$("#t");if(t)t.innerHTML=note};
+const H=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))].map(x=>x.toString(16).padStart(2,"0")).join("");
+const wref=()=>db.doc("wallets/"+me.u);
+const ERR=e=>e&&(e.code=="invalid_argument"?"บัญชีผู้เยี่ยมชมแบบดูอย่างเดียวบันทึกข้อมูลไม่ได้ กรุณาขอสิทธิ์ Contributor":(e.message||e.code))||"ผิดพลาด";
+function theme(){const r=document.documentElement,d=r.dataset.theme?r.dataset.theme=="dark":matchMedia("(prefers-color-scheme:dark)").matches;r.dataset.theme=d?"light":"dark";LS.set("th",r.dataset.theme)}
+if(LS.get("th"))document.documentElement.dataset.theme=LS.get("th");
+function pic(file,max){return new Promise((ok,no)=>{const i=new Image();i.onload=()=>{const k=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);ok(c.toDataURL(/png$/.test(file.type)&&max<300?"image/png":"image/jpeg",.75))};i.onerror=no;i.src=URL.createObjectURL(file)})}
+function ask(msg){return new Promise(r=>{$("#mo").innerHTML=`<div class="ov"><div class="md"><div class="bd"><p>${esc(msg)}</p><div class="r"><button class="b s" id="n">ยกเลิก</button><button class="b d" id="y">ยืนยัน</button></div></div></div></div>`;$("#y").onclick=()=>{$("#mo").innerHTML="";r(1)};$("#n").onclick=()=>{$("#mo").innerHTML="";r(0)}})}
+async function load(){
+  const [s,w,p]=await Promise.all([db.doc("settings/site").get(),me?wref().get():Promise.resolve({exists:false}),db.collection("products").get()]);
+  site=s.exists?s.data():{};const d=w.exists?w.data():{};credits=d.credits||0;orders=d.orders||[];
+  products=p.docs.map(x=>({id:x.id,...x.data()}));
+}
+function head(){return `<header><div class="lg" onclick="home()">${site.logo?`<img src="${site.logo}">`:""}<span>${esc(site.name||"ร้านเครดิต")}</span></div><div class="hr">${me?`<span class="cr">${credits} เครดิต</span>`:""}<button class="ib" onclick="theme()" aria-label="ธีม">◐</button>${me?`<button class="ib" onclick="logout()">ออก</button>`:`<button class="b sm" onclick="goAuth('in')">เข้าสู่ระบบ</button>`}</div></header>`}
+const home=()=>{showAuth=false;pend=null;tab="shop";render()};
+const goAuth=m=>{authMode=m;showAuth=true;note="";render()};
+function render(){
+  if(!me&&showAuth){const i=authMode=='in';$("#app").innerHTML=head()+`<div class="au"><h2>${i?'เข้าสู่ระบบ':'สมัครสมาชิก'}</h2>${pend?'<p class="mu">กรุณาเข้าสู่ระบบหรือสมัครสมาชิกก่อนสั่งซื้อ</p>':''}<input id="u" placeholder="ชื่อผู้ใช้" autocapitalize="none"><input id="pw" type="password" placeholder="รหัสผ่าน"><div id="t">${note}</div><button class="b" style="width:100%" onclick="auth()">${i?'เข้าสู่ระบบ':'สมัครสมาชิก'}</button><p class="mu" style="text-align:center;margin-top:18px">${i?'ยังไม่มีบัญชี? <a href="#" onclick="goAuth(\'up\');return false">สมัครสมาชิก</a>':'มีบัญชีแล้ว? <a href="#" onclick="goAuth(\'in\');return false">เข้าสู่ระบบ</a>'}</p><p style="text-align:center"><a class="mu" href="#" onclick="home();return false">← กลับหน้าร้าน</a></p></div>`;return}
+  const tabs=me?[["shop","ร้านค้า"],["key","เติมเครดิต"]]:[];if(me&&me.role=="admin")tabs.push(["admin","แอดมิน"]);
+  let h=head()+(tabs.length?`<nav>${tabs.map(([k,n])=>`<button class="${tab==k?'on':''}" onclick="tab='${k}';render()">${n}</button>`).join("")}</nav>`:"")+`<div id="t">${note}</div>`;
+  if(tab=="shop")h+=products.length?`<div class="g">${products.map(p=>`<div class="p" onclick="detail('${p.id}')"><div class="im">${p.img?`<img src="${p.img}">`:""}</div><div class="t"><b>${esc(p.name)}</b><span class="mu">${p.price} เครดิต</span></div></div>`).join("")}</div>`:`<div class="c mu">ยังไม่มีสินค้า</div>`;
+  if(tab=="key"){const ig=site.ig?`<a class="b s" target="_blank" rel="noopener" href="https://instagram.com/${encodeURIComponent(site.ig.replace(/^@/,''))}">Instagram</a>`:"",ln=site.line?`<a class="b s" target="_blank" rel="noopener" href="https://line.me/ti/p/~${encodeURIComponent(site.line.replace(/^@/,''))}">LINE</a>`:"";
+    h+=`<div class="c"><h3>ใส่คีย์เพื่อรับเครดิต</h3><div class="mu">1 คีย์ใช้ได้ 1 ครั้ง</div><input id="k" placeholder="XXXX-XXXX-XXXX" autocapitalize="characters"><button class="b" onclick="redeem()">ยืนยันคีย์</button></div>
+    <div class="c"><h3>ซื้อเครดิต</h3><div class="mu" style="margin-bottom:8px">ติดต่อแอดมินเพื่อซื้อคีย์เครดิต</div>${ig||ln?ig+" "+ln:`<span class="mu">แอดมินยังไม่ได้ตั้งช่องทางติดต่อ</span>`}</div>`}
+  if(tab=="admin")h+=`<div class="c"><h3>ตั้งค่าร้าน</h3><input id="sn" placeholder="ชื่อร้าน" value="${esc(site.name)}"><input id="si" placeholder="Instagram (ชื่อผู้ใช้)" value="${esc(site.ig)}"><input id="sl" placeholder="LINE ID" value="${esc(site.line)}"><div class="mu">โลโก้</div><input id="sf" type="file" accept="image/*"><button class="b" onclick="saveSite()">บันทึก</button></div>
+  <div class="c"><h3>สร้างคีย์เครดิต</h3><input id="ka" type="number" value="10" placeholder="เครดิตต่อคีย์"><input id="kn" type="number" value="5" placeholder="จำนวนคีย์"><button class="b" onclick="genKeys()">สร้างคีย์</button><div class="msg" id="kout" style="display:none"></div></div>
+  <div class="c"><h3>เพิ่มสินค้า</h3><input id="pn" placeholder="ชื่อสินค้า"><textarea id="pd" rows="3" placeholder="รายละเอียดสินค้า"></textarea><input id="pp" type="number" value="1" placeholder="ราคา (เครดิต)"><textarea id="pm" rows="2" placeholder="ข้อความที่ลูกค้าได้หลังซื้อ"></textarea><div class="mu">รูปสินค้า</div><input id="pf" type="file" accept="image/*"><button class="b" onclick="addProd()">เพิ่มสินค้า</button></div>
+  <div class="c"><h3>สินค้าทั้งหมด</h3>${products.map(p=>`<div class="r" style="margin:6px 0"><span>${esc(p.name)} · ${p.price}</span><button class="b d" onclick="delProd('${p.id}')">ลบ</button></div>`).join("")||'<span class="mu">ไม่มี</span>'}</div>`;
+  $("#app").innerHTML=h;
+}
+function detail(id){const p=products.find(x=>x.id==id);
+  $("#mo").innerHTML=`<div class="ov" onclick="if(event.target==this)closeM()"><div class="md">${p.img?`<img class="big" src="${p.img}">`:""}<div class="bd"><h3>${esc(p.name)}</h3><p class="mu" style="white-space:pre-wrap">${esc(p.desc)}</p><div class="r"><b>${p.price} เครดิต</b><span><button class="b s" onclick="closeM()">ปิด</button> <button class="b" id="bb" onclick="buy('${p.id}')">สั่งซื้อ</button></span></div></div></div></div>`}
+async function copyMsg(){
+  const b=$("#cp");let ok=false;
+  try{await navigator.clipboard.writeText(lastMsg);ok=true}catch(e){
+    try{const t=document.createElement("textarea");t.value=lastMsg;t.style.cssText="position:fixed;opacity:0";document.body.appendChild(t);t.select();ok=document.execCommand("copy");t.remove()}catch(e2){}}
+  b.textContent=ok?"คัดลอกแล้ว ✓":"คัดลอกไม่ได้ กรุณาเลือกข้อความเอง";
+}
+const closeM=()=>$("#mo").innerHTML="";
+async function auth(){
+  const u=$("#u").value.trim().toLowerCase(),pw=$("#pw").value;
+  if(!/^[a-z0-9_]{3,20}$/.test(u))return say("ชื่อผู้ใช้ 3-20 ตัว (a-z 0-9 _)");
+  if(pw.length<6)return say("รหัสผ่านอย่างน้อย 6 ตัว");
+  try{
+    const r=db.doc("accounts/"+u),s=await r.get();
+    if(authMode=="up"){
+      if(s.exists)return say("ชื่อนี้ถูกใช้แล้ว");
+      const salt=Math.random().toString(36).slice(2,10),hash=await H(salt+pw);
+      await r.set({salt,hash,role:"user"});me={u,role:"user"};LS.set("sess",JSON.stringify({u,hash}));
+    }else{
+      if(!s.exists)return say("ไม่พบบัญชีนี้");
+      const d=s.data(),hash=await H(d.salt+pw);
+      if(hash!=d.hash)return say("รหัสผ่านไม่ถูกต้อง");
+      me={u,role:d.role};LS.set("sess",JSON.stringify({u,hash}));
+    }
+    note="";tab="shop";showAuth=false;await load();render();if(pend){const i=pend;pend=null;detail(i)}
+  }catch(e){say(ERR(e))}
+}
+function logout(){LS.set("sess","");me=null;credits=0;orders=[];tab="shop";showAuth=false;note="";render()}
+async function redeem(){
+  const code=$("#k").value.trim().toUpperCase();if(!code)return say("กรุณากรอกคีย์");
+  try{
+    const r=db.doc("keys/"+code),s=await r.get();
+    if(!s.exists)return say("ไม่พบคีย์นี้");
+    if(s.data().used)return say("คีย์นี้ถูกใช้ไปแล้ว");
+    await r.update({used:true,by:me.u,usedAt:Date.now()});
+    const n=credits+s.data().credits;await wref().set({credits:n});credits=n;
+    note="";render();say("เติมเครดิต +"+s.data().credits+" สำเร็จ",1);
+  }catch(e){say(ERR(e))}
+}
+async function buy(id){
+  const p=products.find(x=>x.id==id);
+  if(!me){pend=id;closeM();goAuth("in");return}
+  if(credits<p.price){closeM();tab="key";render();return say("เครดิตไม่พอ กรุณาเติมเครดิตก่อน")}
+  const b=$("#bb");if(b)b.disabled=true;
+  try{
+    const w=await wref().get(),cur=w.exists?(w.data().credits||0):0;
+    if(cur<p.price){await load();closeM();tab="key";render();return say("เครดิตไม่พอ กรุณาเติมเครดิตก่อน")}
+    await wref().set({credits:cur-p.price});
+    lastMsg=p.message;await load();render();
+    $("#mo").innerHTML=`<div class="ov"><div class="md"><div class="bd"><h3>สั่งซื้อสำเร็จ</h3><p class="mu">ข้อความนี้จะแสดงครั้งเดียว กรุณาคัดลอกเก็บไว้ก่อนปิด</p><div class="msg">${esc(lastMsg)}</div><div class="r" style="margin-top:16px"><button class="b s" onclick="closeM()">ปิด</button><button class="b" id="cp" onclick="copyMsg()">คัดลอกข้อความ</button></div></div></div></div>`;
+  }catch(e){if(b)b.disabled=false;closeM();say("ซื้อไม่สำเร็จ: "+ERR(e))}
+}
+async function saveSite(){
+  try{const d={name:$("#sn").value.trim(),ig:$("#si").value.trim(),line:$("#sl").value.trim(),logo:site.logo||""};
+  const f=$("#sf").files[0];if(f)d.logo=await pic(f,240);
+  await db.doc("settings/site").set(d);await load();render();say("บันทึกแล้ว",1)}catch(e){say(ERR(e))}
+}
+async function genKeys(){
+  const a=+$("#ka").value,n=Math.min(+$("#kn").value,50),out=[];
+  if(!(a>0&&n>0))return say("กรอกจำนวนให้ถูกต้อง");
+  const seg=()=>Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X");
+  try{for(let i=0;i<n;i++){const c=seg()+"-"+seg()+"-"+seg();await db.doc("keys/"+c).set({credits:a,used:false});out.push(c)}
+  const o=$("#kout");o.style.display="block";o.textContent=out.join("\n");say("สร้างแล้ว "+n+" คีย์",1)}catch(e){say(ERR(e))}
+}
+async function addProd(){
+  const name=$("#pn").value.trim(),price=+$("#pp").value;
+  if(!name||!(price>0))return say("กรอกชื่อและราคา");
+  try{const f=$("#pf").files[0],img=f?await pic(f,560):"";
+  await db.collection("products").add({name,desc:$("#pd").value,price,message:$("#pm").value||"ขอบคุณที่ซื้อสินค้า",img});
+  await load();render();say("เพิ่มสินค้าแล้ว",1)}catch(e){say(ERR(e))}
+}
+async function delProd(id){if(!await ask("ลบสินค้านี้?"))return;try{await db.doc("products/"+id).delete();await load();render()}catch(e){say(ERR(e))}}
+
+// ===== ฐานข้อมูลในเครื่อง (localStorage) — ข้อมูลเก็บในเบราว์เซอร์ของแต่ละเครื่องเท่านั้น =====
+function mkDb(){
+  const K="shopdb",rd=()=>{try{return JSON.parse(localStorage.getItem(K)||"{}")}catch(e){return{}}},wr=o=>localStorage.setItem(K,JSON.stringify(o));
+  const o=rd();
+  if(!o["accounts/admin"])o["accounts/admin"]={hash:"e3980421a17869fc6c1adeac77c69a94bd70f57ddb9dbd33bdbee65b4cf0f0da",role:"admin",salt:"k7m2q9xa"};
+  if(!o["settings/site"])o["settings/site"]={name:"ร้านเครดิต",ig:"",line:"",logo:""};
+  wr(o);
+  const snap=(p,d)=>({id:p.split("/").pop(),exists:!!d,data:()=>d});
+  return{
+    doc:p=>({
+      get:async()=>snap(p,rd()[p]),
+      set:async x=>{const o=rd();o[p]=x;wr(o)},
+      update:async x=>{const o=rd();o[p]={...(o[p]||{}),...x};wr(o)},
+      delete:async()=>{const o=rd();delete o[p];wr(o)}}),
+    collection:c=>({
+      get:async()=>{const o=rd(),n=c.split("/").length+1;return{docs:Object.keys(o).filter(k=>k.startsWith(c+"/")&&k.split("/").length==n).map(k=>snap(k,o[k]))}},
+      add:async x=>{const id=Math.random().toString(36).slice(2,10),o=rd();o[c+"/"+id]=x;wr(o);return{id}}})
+  }
+}
+(async()=>{
+  try{
+    db=mkDb();
+    const s=await db.doc("settings/site").get();site=s.exists?s.data():{};
+    try{const ss=JSON.parse(LS.get("sess")||"null");if(ss){const a=await db.doc("accounts/"+ss.u).get();if(a.exists&&a.data().hash==ss.hash){me={u:ss.u,role:a.data().role};await load()}}}catch(e){}
+    render();
+  }catch(e){$("#app").innerHTML=`<div class="c er">โหลดไม่สำเร็จ: ${esc(e.message||e.code)}</div>`}
+})();
+</script></body></html>
