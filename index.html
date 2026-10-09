@@ -60,13 +60,10 @@ select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-ra
 
 .chip{font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--bd);white-space:nowrap;display:inline-block}.chip.approved{color:var(--ok);border-color:var(--ok)}.chip.rejected{color:var(--er);border-color:var(--er)}.chip.pending{color:var(--mu)}
 .rw{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--bd)}.rw:last-child{border:0}.ac{display:flex;gap:6px;flex-wrap:wrap}
-</style>
-<!-- นำเข้า Supabase SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head><body><div class="sp" id="sp0"></div><div class="w"><div id="app" class="mu">กำลังโหลด...</div></div><div id="mo"></div>
+</style></head><body><div class="sp" id="sp0"></div><div class="w"><div id="app" class="mu">กำลังโหลด...</div></div><div id="mo"></div>
 <script>
 const $=s=>document.querySelector(s);
-const esc=s=>String(s?="" ).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let lastMsg="",db,me=null,showAuth=false,pend=null,credits=0,orders=[],products=[],site={},tab="shop",note="",authMode="in";
 const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const say=(m,ok)=>{let w=$("#tw");if(!w){w=document.createElement("div");w.id="tw";document.body.appendChild(w)}
@@ -74,48 +71,20 @@ const say=(m,ok)=>{let w=$("#tw");if(!w){w=document.createElement("div");w.id="t
   const t=document.createElement("div");t.className="ts"+(ok?"":" er");t.innerHTML=`<i>${ok?"✓":"!"}</i><span>${esc(m)}</span><u></u>`;
   const x=()=>{t.classList.add("out");setTimeout(()=>t.remove(),250)};t.onclick=x;w.appendChild(t);setTimeout(x,3400)};
 const H=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))].map(x=>x.toString(16).padStart(2,"0")).join("");
+const wref=()=>db.doc("wallets/"+me.u);
 const ERR=e=>e&&(e.code=="invalid_argument"?"บัญชีผู้เยี่ยมชมแบบดูอย่างเดียวบันทึกข้อมูลไม่ได้ กรุณาขอสิทธิ์ Contributor":(e.message||e.code))||"ผิดพลาด";
 function theme(){const r=document.documentElement,d=r.dataset.theme?r.dataset.theme=="dark":matchMedia("(prefers-color-scheme:dark)").matches;r.dataset.theme=d?"light":"dark";LS.set("th",r.dataset.theme)}
 if(LS.get("th"))document.documentElement.dataset.theme=LS.get("th");
 function pic(file,max){return new Promise((ok,no)=>{const i=new Image();i.onload=()=>{const k=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);ok(c.toDataURL(/png$/.test(file.type)&&max<300?"image/png":"image/jpeg",.75))};i.onerror=no;i.src=URL.createObjectURL(file)})}
 function ask(msg){return new Promise(r=>{$("#mo").innerHTML=`<div class="ov"><div class="md"><div class="bd"><p>${esc(msg)}</p><div class="r"><button class="b s" id="n">ยกเลิก</button><button class="b d" id="y">ยืนยัน</button></div></div></div></div>`;$("#y").onclick=()=>{$("#mo").innerHTML="";r(1)};$("#n").onclick=()=>{$("#mo").innerHTML="";r(0)}})}
-
 async function load(){
-  try {
-    const [s, p] = await Promise.all([
-      db.from("settings").select("*").eq("id", "site").maybeSingle(),
-      db.from("products").select("*")
-    ]);
-    site = s.data || {};
-    products = p.data || [];
-    
-    if (me) {
-      const w = await db.from("wallets").select("*").eq("u", me.u).maybeSingle();
-      const d = w.data || {};
-      credits = d.credits || 0;
-      orders = d.orders || [];
-      
-      const topupsRes = await db.from("topups").select("*").eq("u", me.u).order("at", { ascending: false });
-      myTop = topupsRes.data || [];
-      
-      if (me.role == "admin") {
-        const [allTopRes, acctsRes, walsRes, logsRes] = await Promise.all([
-          db.from("topups").select("*").order("at", { ascending: false }),
-          db.from("accounts").select("*"),
-          db.from("wallets").select("*"),
-          db.from("logins").select("*").order("at", { ascending: false }).limit(500)
-        ]);
-        allTop = allTopRes.data || [];
-        accts = acctsRes.data || [];
-        wals = walsRes.data || [];
-        logs = logsRes.data || [];
-      }
-    }
-  } catch (e) {
-    console.error(e);
-  }
+  const [s,w,p]=await Promise.all([db.doc("settings/site").get(),me?wref().get():Promise.resolve({exists:false}),db.collection("products").get()]);
+  site=s.exists?s.data():{};applyTheme(site);const d=w.exists?w.data():{};credits=d.credits||0;orders=d.orders||[];
+  products=p.docs.map(x=>({id:x.id,...x.data()}));
+  if(me){const g=async q=>(await q.get()).docs.map(x=>({id:x.id,...x.data()}));
+    myTop=(await g(db.collection("topups").where("u","==",me.u))).sort((a,b)=>b.at-a.at);
+    if(me.role=="admin"){[allTop,accts,wals,logs]=await Promise.all([g(db.collection("topups")),g(db.collection("accounts")),g(db.collection("wallets")),g(db.collection("logins").orderBy("at","desc").limit(500))]);allTop.sort((a,b)=>b.at-a.at)}}
 }
-
 function head(){return `<header><div class="lg" onclick="home()">${site.logo?`<img src="${site.logo}">`:""}<span>${esc(site.name||"ร้านเครดิต")}</span></div><div class="hr">${me?`<span class="cr">${credits} เครดิต</span>`:""}<button class="ib" onclick="theme()" aria-label="ธีม">◐</button>${me?`<button class="ib" onclick="logout()">ออก</button>`:`<button class="b sm" onclick="goAuth('in')">เข้าสู่ระบบ</button>`}</div></header>`}
 const home=()=>{showAuth=false;pend=null;tab="shop";render()};
 const goAuth=m=>{authMode=m;showAuth=true;note="";render()};
@@ -144,18 +113,16 @@ async function auth(){
   if(!/^[a-z0-9_]{3,20}$/.test(u))return say("ชื่อผู้ใช้ 3-20 ตัว (a-z 0-9 _)");
   if(pw.length<6)return say("รหัสผ่านอย่างน้อย 6 ตัว");
   try{
-    const res = await db.from("accounts").select("*").eq("id", u).maybeSingle();
-    const s = res.data;
+    const r=db.doc("accounts/"+u),s=await r.get();
     if(authMode=="up"){
-      if(s)return say("ชื่อนี้ถูกใช้แล้ว");
+      if(s.exists)return say("ชื่อนี้ถูกใช้แล้ว");
       const salt=Math.random().toString(36).slice(2,10),hash=await H(salt+pw);
-      await db.from("accounts").insert([{id: u, salt, hash, role: "user"}]);
-      me={u,role:"user"};LS.set("sess",JSON.stringify({u,hash}));
+      await r.set({salt,hash,role:"user"});me={u,role:"user"};LS.set("sess",JSON.stringify({u,hash}));
     }else{
-      if(!s)return say("ไม่พบบัญชีนี้");
-      const hash=await H(s.salt+pw);
-      if(hash!=s.hash)return say("รหัสผ่านไม่ถูกต้อง");
-      me={u,role:s.role};LS.set("sess",JSON.stringify({u,hash}));
+      if(!s.exists)return say("ไม่พบบัญชีนี้");
+      const d=s.data(),hash=await H(d.salt+pw);
+      if(hash!=d.hash)return say("รหัสผ่านไม่ถูกต้อง");
+      me={u,role:d.role};LS.set("sess",JSON.stringify({u,hash}));
     }
     track(u);note="";tab="shop";showAuth=false;await load();render();if(pend){const i=pend;pend=null;detail(i)}say((authMode=="up"?"สมัครสมาชิกสำเร็จ ยินดีต้อนรับ ":"ยินดีต้อนรับ ")+u,1);
   }catch(e){say(ERR(e))}
@@ -164,15 +131,12 @@ function logout(){LS.set("sess","");me=null;credits=0;orders=[];tab="shop";showA
 async function redeem(){
   const code=$("#k").value.trim().toUpperCase();if(!code)return say("กรุณากรอกคีย์");
   try{
-    const res = await db.from("keys").select("*").eq("id", code).maybeSingle();
-    const s = res.data;
-    if(!s)return say("ไม่พบคีย์นี้");
-    if(s.used)return say("คีย์นี้ถูกใช้ไปแล้ว");
-    await db.from("keys").update({used:true,by:me.u,usedAt:Date.now()}).eq("id", code);
-    const n=credits+s.credits;
-    await db.from("wallets").upsert({u: me.u, credits: n});
-    credits=n;
-    note="";render();say("เติมเครดิต +"+s.credits+" สำเร็จ",1);
+    const r=db.doc("keys/"+code),s=await r.get();
+    if(!s.exists)return say("ไม่พบคีย์นี้");
+    if(s.data().used)return say("คีย์นี้ถูกใช้ไปแล้ว");
+    await r.update({used:true,by:me.u,usedAt:Date.now()});
+    const n=credits+s.data().credits;await wref().set({credits:n});credits=n;
+    note="";render();say("เติมเครดิต +"+s.data().credits+" สำเร็จ",1);
   }catch(e){say(ERR(e))}
 }
 async function buy(id){
@@ -181,10 +145,9 @@ async function buy(id){
   if(credits<p.price){closeM();tab="key";render();return say("เครดิตไม่พอ กรุณาเติมเครดิตก่อน")}
   const b=$("#bb");if(b)b.disabled=true;
   try{
-    const wRes = await db.from("wallets").select("*").eq("u", me.u).maybeSingle();
-    const cur = wRes.data ? (wRes.data.credits||0) : 0;
+    const w=await wref().get(),cur=w.exists?(w.data().credits||0):0;
     if(cur<p.price){await load();closeM();tab="key";render();return say("เครดิตไม่พอ กรุณาเติมเครดิตก่อน")}
-    await db.from("wallets").upsert({u: me.u, credits: cur - p.price});
+    await wref().set({credits:cur-p.price});
     lastMsg=p.message;await load();render();
     $("#mo").innerHTML=`<div class="ov"><div class="md"><div class="bd"><h3>สั่งซื้อสำเร็จ</h3><p class="mu">ข้อความนี้จะแสดงครั้งเดียว กรุณาคัดลอกเก็บไว้ก่อนปิด</p><div class="msg">${esc(lastMsg)}</div><div class="r" style="margin-top:16px"><button class="b s" onclick="closeM()">ปิด</button><button class="b" id="cp" onclick="copyMsg()">คัดลอกข้อความ</button></div></div></div></div>`;say("สั่งซื้อสำเร็จ",1);
   }catch(e){if(b)b.disabled=false;closeM();say("ซื้อไม่สำเร็จ: "+ERR(e))}
@@ -227,24 +190,12 @@ function readTheme(){const g=i=>$("#"+i);return{bgL:g("bgL").value,txL:g("txL").
 function preview(){applyTheme({...site,...readTheme()});document.querySelectorAll("input[type=range]").forEach(r=>{const b=$("#"+r.id+"v");if(b)b.textContent=r.value})}
 const previewSplash=()=>splash({...site,...readTheme(),spOn:true});
 async function resetTheme(){if(!await ask("รีเซ็ตสีและธีมทั้งหมดเป็นค่าเริ่มต้น?"))return;
-  try{
-    await db.from("settings").upsert({id: "site", name:site.name||"", ig:site.ig||"", line:site.line||"", logo:site.logo||""});
-    await load();render();say("รีเซ็ตแล้ว",1)
-  }catch(e){say(ERR(e))}}
+  try{await db.doc("settings/site").set({name:site.name||"",ig:site.ig||"",line:site.line||"",logo:site.logo||""});await load();render();say("รีเซ็ตแล้ว",1)}catch(e){say(ERR(e))}}
 
 let myTop=[],allTop=[],accts=[],wals=[],logs=[],asub="topups";
 const fd=t=>new Date(t).toLocaleString("th-TH");
 const SN={approved:"อนุมัติ",rejected:"ไม่อนุมัติ",pending:"รอตรวจสอบ"};
-async function track(u){
-  try{
-    const now=Date.now();
-    await db.from("logins").insert([{id: now+"-"+u, u, at:now}]);
-    const res = await db.from("accounts").select("*").eq("id", u).maybeSingle();
-    if(res.data){
-      await db.from("accounts").update({lastLogin: now, loginCount: (res.data.loginCount||0)+1}).eq("id", u);
-    }
-  }catch(e){}
-}
+async function track(u){try{const now=Date.now();await db.doc("logins/"+now+"-"+u).set({u,at:now});const r=db.doc("accounts/"+u),s=await r.get();await r.update({lastLogin:now,loginCount:(s.data().loginCount||0)+1})}catch(e){}}
 function calc(){const a=+$("#ta").value;$("#tc").textContent=a>0?"จะได้รับ "+Math.floor(a*(site.rate||1))+" เครดิต":""}
 function topupUI(){
   const on=site.qr||site.pay,rate=site.rate||1,mn=site.min||0;
@@ -256,15 +207,15 @@ async function sendTopup(){
   const b=$("#tb");b.disabled=true;
   try{let img=await pic(f,700);if(img.length>230000)img=await pic(f,480);
     const id="t"+Date.now()+Math.random().toString(36).slice(2,5);
-    await db.from("slips").insert([{id, img}]);
-    await db.from("topups").insert([{id, u: me.u, amount: a, credits: Math.floor(a*(site.rate||1)), status: "pending", at: Date.now()}]);
+    await db.doc("slips/"+id).set({img});
+    await db.doc("topups/"+id).set({u:me.u,amount:a,credits:Math.floor(a*(site.rate||1)),status:"pending",at:Date.now()});
     await load();render();say("ส่งแจ้งโอนแล้ว รอแอดมินตรวจสอบ",1)
   }catch(e){b.disabled=false;say(ERR(e))}
 }
 const topRow=t=>`<div class="rw"><div><b>${esc(t.u)}</b> · ${t.amount} บาท → ${t.credits} เครดิต<div class="mu">${fd(t.at)}${t.by?" · โดย "+esc(t.by):""}</div></div><div class="ac"><button class="b s sm" onclick="showSlip('${t.id}')">สลิป</button>${t.status=="pending"?`<button class="b sm" onclick="decide('${t.id}',1)">อนุมัติ</button><button class="b d sm" onclick="decide('${t.id}',0)">ปฏิเสธ</button>`:`<span class="chip ${t.status}">${SN[t.status]}</span>`}</div></div>`;
 const adminTop=()=>{const P=allTop.filter(t=>t.status=="pending"),D=allTop.filter(t=>t.status!="pending");
   return `<div class="c"><h3>รอตรวจสอบ (${P.length})</h3>${P.map(topRow).join("")||'<span class="mu">ไม่มีรายการ</span>'}</div><div class="c"><h3>ประวัติเติมเงิน</h3>${D.slice(0,50).map(topRow).join("")||'<span class="mu">ยังไม่มี</span>'}</div>`};
-const crOf=u=>(wals.find(w=>w.u==u)||{}).credits||0;
+const crOf=u=>(wals.find(w=>w.id==u)||{}).credits||0;
 const totOf=u=>allTop.filter(t=>t.u==u&&t.status=="approved").reduce((s,t)=>s+t.amount,0);
 const adminUsers=()=>{const L=[...accts].sort((a,b)=>(b.lastLogin||0)-(a.lastLogin||0));
   return `<div class="c"><h3>สมาชิกทั้งหมด (${L.length})</h3><div class="mu">กดที่ชื่อเพื่อดูรายละเอียด</div>${L.map(a=>`<div class="rw" style="cursor:pointer" onclick="userDetail('${a.id}')"><div><b>${esc(a.id)}</b>${a.role=="admin"?' <span class="chip">แอดมิน</span>':""}<div class="mu">เข้าล่าสุด ${a.lastLogin?fd(a.lastLogin):"-"} · ${a.loginCount||0} ครั้ง</div></div><div style="text-align:right"><div>${crOf(a.id)} เครดิต</div><div class="mu">เติมแล้ว ${totOf(a.id)} บาท</div></div></div>`).join("")}</div>`};
@@ -272,25 +223,15 @@ function userDetail(u){const L=logs.filter(l=>l.u==u).slice(0,15),T=allTop.filte
   $("#mo").innerHTML=`<div class="ov" onclick="if(event.target==this)closeM()"><div class="md"><div class="bd"><h3>${esc(u)}</h3><div class="mu">เครดิตคงเหลือ ${crOf(u)} · เติมแล้ว ${totOf(u)} บาท · เข้าสู่ระบบ ${a.loginCount||0} ครั้ง</div><div class="mu" style="margin:16px 0 4px"><b>ประวัติเข้าสู่ระบบ</b></div>${L.map(l=>`<div class="mu">${fd(l.at)}</div>`).join("")||'<div class="mu">-</div>'}<div class="mu" style="margin:16px 0 4px"><b>ประวัติเติมเงิน</b></div>${T.map(t=>`<div class="rw"><span class="mu">${fd(t.at)} ·${t.amount} บาท</span><span class="chip ${t.status}">${SN[t.status]}</span></div>`).join("")||'<div class="mu">-</div>'}<div style="margin-top:16px;text-align:right"><button class="b s" onclick="closeM()">ปิด</button></div></div></div></div>`}
 async function showSlip(id){
   $("#mo").innerHTML=`<div class="ov"><div class="md"><div class="bd mu">กำลังโหลดสลิป...</div></div></div>`;
-  try{
-    const res = await db.from("slips").select("*").eq("id", id).maybeSingle();
-    const s = res.data;
-    $("#mo").innerHTML=`<div class="ov" onclick="if(event.target==this)closeM()"><div class="md">${s?`<img class="big" style="aspect-ratio:auto;height:auto" src="${s.img}">`:'<div class="bd mu">ไม่พบสลิป</div>'}<div class="bd"><button class="b s" onclick="closeM()">ปิด</button></div></div></div>`
-  }catch(e){closeM();say(ERR(e))}
+  try{const s=await db.doc("slips/"+id).get();$("#mo").innerHTML=`<div class="ov" onclick="if(event.target==this)closeM()"><div class="md">${s.exists?`<img class="big" style="aspect-ratio:auto;height:auto" src="${s.data().img}">`:'<div class="bd mu">ไม่พบสลิป</div>'}<div class="bd"><button class="b s" onclick="closeM()">ปิด</button></div></div></div>`}catch(e){closeM();say(ERR(e))}
 }
 async function decide(id,ok){
   const t=allTop.find(x=>x.id==id);if(!t)return;
   if(!await ask((ok?"อนุมัติ ":"ปฏิเสธ ")+t.u+" · "+t.amount+" บาท ("+t.credits+" เครดิต)?"))return;
-  try{
-    const curRes = await db.from("topups").select("*").eq("id", id).maybeSingle();
-    const cur = curRes.data;
-    if(!cur||cur.status!="pending")return say("รายการนี้ถูกดำเนินการแล้ว");
-    await db.from("topups").update({status:ok?"approved":"rejected",by:me.u,decidedAt:Date.now()}).eq("id", id);
-    if(ok){
-      const wsRes = await db.from("wallets").select("*").eq("u", t.u).maybeSingle();
-      const c = wsRes.data ? (wsRes.data.credits||0) : 0;
-      await db.from("wallets").upsert({u: t.u, credits: c + t.credits});
-    }
+  try{const r=db.doc("topups/"+id),cur=await r.get();
+    if(!cur.exists||cur.data().status!="pending")return say("รายการนี้ถูกดำเนินการแล้ว");
+    await r.update({status:ok?"approved":"rejected",by:me.u,decidedAt:Date.now()});
+    if(ok){const w=db.doc("wallets/"+t.u),ws=await w.get(),c=ws.exists?(ws.data().credits||0):0;await w.set({credits:c+t.credits})}
     await load();render();say(ok?"อนุมัติแล้ว เพิ่มเครดิตให้ "+t.u:"ปฏิเสธรายการแล้ว",1)
   }catch(e){say(ERR(e))}
 }
@@ -308,57 +249,55 @@ function adminHTML(){
   return h
 }
 async function saveSite(){
-  try{
-    const d={...site,...readTheme(),id: "site", name:$("#sn").value.trim(),ig:$("#si").value.trim(),line:$("#sl").value.trim(),pay:$("#pay").value.trim(),rate:+$("#rate").value\vert{}\vert{}1,min:+$("#mn").value||0,logo:site.logo||"",qr:site.qr||""};
-    const f=$("#sf").files[0];if(f)d.logo=await pic(f,240);
-    const q=$("#qrf").files[0];if(q)d.qr=await pic(q,520);
-    await db.from("settings").upsert(d);await load();render();say("บันทึกแล้ว",1)
-  }catch(e){say(ERR(e))}
+  try{const d={...site,...readTheme(),name:$("#sn").value.trim(),ig:$("#si").value.trim(),line:$("#sl").value.trim(),pay:$("#pay").value.trim(),rate:+$("#rate").value\vert{}\vert{}1,min:+$("#mn").value||0,logo:site.logo||"",qr:site.qr||""};
+  const f=$("#sf").files[0];if(f)d.logo=await pic(f,240);
+  const q=$("#qrf").files[0];if(q)d.qr=await pic(q,520);
+  await db.doc("settings/site").set(d);await load();render();say("บันทึกแล้ว",1)}catch(e){say(ERR(e))}
 }
 async function genKeys(){
   const a=+$("#ka").value,n=Math.min(+$("#kn").value,50),out=[];
   if(!(a>0&&n>0))return say("กรอกจำนวนให้ถูกต้อง");
   const seg=()=>Math.random().toString(36).slice(2,6).toUpperCase().padEnd(4,"X");
-  try{
-    for(let i=0;i<n;i++){
-      const c=seg()+"-"+seg()+"-"+seg();
-      await db.from("keys").insert([{id: c, credits: a, used: false}]);
-      out.push(c);
-    }
-    const o=$("#kout");o.style.display="block";o.textContent=out.join("\n");say("สร้างแล้ว "+n+" คีย์",1)
-  }catch(e){say(ERR(e))}
+  try{for(let i=0;i<n;i++){const c=seg()+"-"+seg()+"-"+seg();await db.doc("keys/"+c).set({credits:a,used:false});out.push(c)}
+  const o=$("#kout");o.style.display="block";o.textContent=out.join("\n");say("สร้างแล้ว "+n+" คีย์",1)}catch(e){say(ERR(e))}
 }
 async function addProd(){
   const name=$("#pn").value.trim(),price=+$("#pp").value;
   if(!name||!(price>0))return say("กรอกชื่อและราคา");
-  try{
-    const f=$("#pf").files[0],img=f?await pic(f,560):"";
-    const id="p"+Date.now()+Math.random().toString(36).slice(2,5);
-    await db.from("products").insert([{id, name, desc:$("#pd").value, price, message:$("#pm").value||"ขอบคุณที่ซื้อสินค้า", img}]);
-    await load();render();say("เพิ่มสินค้าแล้ว",1)
-  }catch(e){say(ERR(e))}
+  try{const f=$("#pf").files[0],img=f?await pic(f,560):"";
+  await db.collection("products").add({name,desc:$("#pd").value,price,message:$("#pm").value||"ขอบคุณที่ซื้อสินค้า",img});
+  await load();render();say("เพิ่มสินค้าแล้ว",1)}catch(e){say(ERR(e))}
 }
-async function delProd(id){if(!await ask("ลบสินค้านี้?"))return;try{await db.from("products").delete().eq("id", id);await load();render()}catch(e){say(ERR(e))}}
+async function delProd(id){if(!await ask("ลบสินค้านี้?"))return;try{await db.doc("products/"+id).delete();await load();render()}catch(e){say(ERR(e))}}
 
-// เชื่อมต่อ Supabase ด้วยข้อมูลที่คุณให้มา
+function mkDb(){
+  const K="shopdb",rd=()=>{try{return JSON.parse(localStorage.getItem(K)||"{}")}catch(e){return{}}},wr=o=>localStorage.setItem(K,JSON.stringify(o));
+  const o=rd();
+  if(!o["accounts/admin"])o["accounts/admin"]={hash:"e3980421a17869fc6c1adeac77c69a94bd70f57ddb9dbd33bdbee65b4cf0f0da",role:"admin",salt:"k7m2q9xa"};
+  if(!o["settings/site"])o["settings/site"]={name:"ร้านเครดิต",ig:"",line:"",logo:""};
+  wr(o);
+  const snap=(p,d)=>({id:p.split("/").pop(),exists:!!d,data:()=>d});
+  const Q=(c,f=[],ord=null,lim=0)=>({
+    where:(a,op,v)=>Q(c,[...f,[a,op,v]],ord,lim),orderBy:(a,d="asc")=>Q(c,f,[a,d],lim),limit:n=>Q(c,f,ord,n),
+    get:async()=>{const o=rd(),n=c.split("/").length+1;let l=Object.keys(o).filter(k=>k.startsWith(c+"/")&&k.split("/").length==n).map(k=>snap(k,o[k]));
+      f.forEach(([a,op,v])=>{l=l.filter(d=>{const x=d.data()[a];return op=="=="?x===v:op=="!="?x!==v:true})});
+      if(ord)l.sort((p,q)=>{const a=p.data()[ord[0]],b=q.data()[ord[0]];return(a>b?1:a<b?-1:0)*(ord[1]=="desc"?-1:1)});
+      if(lim)l=l.slice(0,lim);return{docs:l}},
+    add:async x=>{const id=Math.random().toString(36).slice(2,10),o=rd();o[c+"/"+id]=x;wr(o);return{id}}});
+  return{
+    doc:p=>({
+      get:async()=>snap(p,rd()[p]),
+      set:async x=>{const o=rd();o[p]=x;wr(o)},
+      update:async x=>{const o=rd();o[p]={...(o[p]||{}),...x};wr(o)},
+      delete:async()=>{const o=rd();delete o[p];wr(o)}}),
+    collection:c=>Q(c)
+  }
+}
 (async()=>{
   try{
-    db = window.supabase.createClient(
-      "https://zymjiseosixerhwebhfx.supabase.co",
-      "Sb_publishable_K6-BlZEV6Mq3n2CdarW2lQ_Se0aCA9i"
-    );
-    await load();
-    const s = await db.from("settings").select("*").eq("id", "site").maybeSingle();
-    site = s.data || {};
-    applyTheme(site);splash(site);
-    try{
-      const ss=JSON.parse(LS.get("sess")||"null");
-      if(ss){
-        const aRes = await db.from("accounts").select("*").eq("id", ss.u).maybeSingle();
-        const a = aRes.data;
-        if(a&&a.hash==ss.hash){me={u:ss.u,role:a.role};await load()}
-      }
-    }catch(e){}
+    db=mkDb();
+    const s=await db.doc("settings/site").get();site=s.exists?s.data():{};applyTheme(site);splash(site);
+    try{const ss=JSON.parse(LS.get("sess")||"null");if(ss){const a=await db.doc("accounts/"+ss.u).get();if(a.exists&&a.data().hash==ss.hash){me={u:ss.u,role:a.data().role};await load()}}}catch(e){}
     render();
   }catch(e){$("#app").innerHTML=`<div class="c er">โหลดไม่สำเร็จ: ${esc(e.message||e.code)}</div>`}
 })();
